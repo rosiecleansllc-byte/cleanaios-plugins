@@ -1,5 +1,3 @@
-import { useState, useEffect, useRef } from "react";
-
 // ─── Font Loader ──────────────────────────────────────────────────────────────
 if (typeof document !== "undefined") {
   const link = document.createElement("link");
