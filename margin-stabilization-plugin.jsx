@@ -1,3 +1,5 @@
+const { useState, useEffect, useRef } = React;
+
 // ─── Font Loader ──────────────────────────────────────────────────────────────
 if (typeof document !== "undefined") {
   const link = document.createElement("link");
