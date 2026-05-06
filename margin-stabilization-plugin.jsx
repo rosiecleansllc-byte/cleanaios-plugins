@@ -41,7 +41,9 @@ function getStage(totalRevenue) {
   if (totalRevenue < 20000) return { n: 2, name: "Stability" };
   if (totalRevenue < 35000) return { n: 3, name: "Systems" };
   if (totalRevenue < 50000) return { n: 4, name: "Leadership" };
-  return { n: 5, name: "Ownership" };
+  if (totalRevenue < 75000) return { n: 5, name: "Ownership" };
+  if (totalRevenue < 100000) return { n: 6, name: "Scale" };
+  return { n: 7, name: "Enterprise" };
 }
 
 // ─── Math Engine (single source of truth) ────────────────────────────────────
@@ -64,7 +66,7 @@ function calc(inp) {
   } = inp;
 
   const freqDiv =
-    freqType === "weekly" ? 4 : freqType === "biweekly" ? 2 : 1;
+    freqType === "weekly" ? 4 : freqType === "biweekly" ? 2 : freqType === "triweekly" ? 4/3 : 1;
 
   const recRevenue = totalRevenue - oneTimeRevenue;
   const recJobs =
@@ -742,7 +744,7 @@ function QuickStartScreen({ qs, setQs, onBuild, t }) {
   const otAvg = otJobs > 0 ? n(qs.oneTimeRevenue) / otJobs : 0;
   const currentAcv = n(qs.clientCount) > 0 ? recRevenue / n(qs.clientCount) : 0;
   const freqDiv =
-    qs.freqType === "weekly" ? 4 : qs.freqType === "biweekly" ? 2 : 1;
+    qs.freqType === "weekly" ? 4 : qs.freqType === "biweekly" ? 2 : qs.freqType === "triweekly" ? 4/3 : 1;
   const acvNeeded =
     n(qs.clientCount) > 0 ? n(qs.goalRevenue) / n(qs.clientCount) : 0;
 
@@ -960,7 +962,7 @@ function QuickStartScreen({ qs, setQs, onBuild, t }) {
             Cleaning frequency
           </label>
           <div style={{ display: "flex", gap: 8 }}>
-            {["weekly", "biweekly", "monthly"].map((f) => (
+            {["weekly", "biweekly", "triweekly", "monthly"].map((f) => (
               <button
                 key={f}
                 onClick={() => setQs((p) => ({ ...p, freqType: f }))}
@@ -1299,7 +1301,7 @@ function PremiumModelTab({ inp, setInp, c, t }) {
             Frequency
           </label>
           <div style={{ display: "flex", gap: 6 }}>
-            {["weekly", "biweekly", "monthly"].map((f) => (
+            {["weekly", "biweekly", "triweekly", "monthly"].map((f) => (
               <button
                 key={f}
                 onClick={() => setInp((p) => ({ ...p, freqType: f }))}
@@ -1664,7 +1666,7 @@ function NewClientAcvTab({ inp, setInp, c, t }) {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: t.bg }}>
-                {["New Clients", "ACV Needed", "Price / Job", "Hits Goal"].map((h) => (
+                {["New Clients", "ACV/mo Needed", "Price/Job (biweekly)", "Hits Goal"].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -1730,6 +1732,66 @@ function NewClientAcvTab({ inp, setInp, c, t }) {
             </tbody>
           </table>
         </div>
+
+        {/* How the math works */}
+        <div style={{
+          background: t.blue + "12",
+          border: `1px solid ${t.blue}40`,
+          borderRadius: 10,
+          padding: "12px 14px",
+          marginTop: 12,
+          fontSize: 12,
+          color: t.text,
+          lineHeight: 1.6,
+        }}>
+          <div style={{ fontWeight: 700, color: t.blue, marginBottom: 4 }}>📐 How this table works</div>
+          <div><strong>Price/Job</strong> is your per-visit biweekly rate (2 visits/month).</div>
+          <div style={{ marginTop: 4 }}>
+            Example: <span style={{ fontFamily: "DM Mono", color: t.amber }}>$220/job × 2 visits = $440/mo ACV</span> — that's the monthly value of one biweekly client.
+          </div>
+          <div style={{ marginTop: 4 }}>The "ACV/mo Needed" column shows what each new client must pay per month to hit your goal with that many new clients.</div>
+        </div>
+
+        {/* Revenue Source Ideas */}
+        <div style={{ marginTop: 16 }}>
+          <div style={{
+            fontSize: 11,
+            color: t.muted,
+            textTransform: "uppercase",
+            letterSpacing: "0.1em",
+            marginBottom: 10,
+          }}>
+            💡 Ways to Grow Your ACV — Revenue Source Ideas
+          </div>
+          {[
+            { label: "Biweekly Residential (Premium)", acv: "$400–$600/mo", desc: "Your core. Move clients from monthly → biweekly and raise rates $20–$40/visit." },
+            { label: "Weekly Residential", acv: "$700–$1,200/mo", desc: "High-income households who want weekly. 4 visits/month = 2× the ACV of biweekly." },
+            { label: "Airbnb / Short-Term Rentals", acv: "$500–$1,500/mo", desc: "Turnover cleans between guests. 4–8 cleans/month at $100–$200 each. Hosts pay fast." },
+            { label: "Apartment Turnover Cleaning", acv: "$800–$2,000/mo", desc: "Work with property managers for move-in/move-out cleans. High volume, steady pipeline." },
+            { label: "Property Management Partnerships", acv: "$2,000–$8,000/mo", desc: "One contract = 10–50+ units. Target companies managing 50–500 unit portfolios in your area." },
+            { label: "Small Commercial Offices", acv: "$600–$2,500/mo", desc: "2–5x/week cleaning. Higher frequency = higher ACV per account. Stable, low-churn clients." },
+            { label: "Post-Construction Cleaning", acv: "$300–$1,500/job", desc: "One-time but high ticket. Partner with local contractors and builders for referrals." },
+          ].map((src) => (
+            <div key={src.label} style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              padding: "10px 12px",
+              borderRadius: 8,
+              background: t.surface,
+              border: `1px solid ${t.border}`,
+              marginBottom: 6,
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontWeight: 600, fontSize: 13, color: t.text }}>{src.label}</span>
+                  <span style={{ fontFamily: "DM Mono", fontSize: 12, color: t.green }}>{src.acv}</span>
+                </div>
+                <div style={{ fontSize: 11, color: t.muted, marginTop: 3 }}>{src.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -1737,11 +1799,13 @@ function NewClientAcvTab({ inp, setInp, c, t }) {
 
 // ─── Tab 5: Growth Ladder ─────────────────────────────────────────────────────
 const STAGES_LIST = [
-  { n: 1, name: "Validation", range: "Under $10K" },
-  { n: 2, name: "Stability", range: "$10K–$20K" },
-  { n: 3, name: "Systems", range: "$20K–$35K" },
-  { n: 4, name: "Leadership", range: "$35K–$50K" },
-  { n: 5, name: "Ownership", range: "$50K+" },
+  { n: 1, name: "Validation", range: "Under $10K", focus: "Prove the model. Price at your floor. Build your first recurring clients." },
+  { n: 2, name: "Stability", range: "$10K–$20K", focus: "Stop doing every job yourself. Document your process. Raise prices on underpriced clients." },
+  { n: 3, name: "Systems", range: "$20K–$35K", focus: "Build repeatable operations. Optimize routes. Aim for 50%+ gross margin." },
+  { n: 4, name: "Leadership", range: "$35K–$50K", focus: "Add a team lead. Launch premium tiers. Start converting to commercial or property management." },
+  { n: 5, name: "Ownership", range: "$50K–$75K", focus: "Multi-team operation. Owner works ON the business. Commercial revenue should be 20–30% of mix." },
+  { n: 6, name: "Scale", range: "$75K–$100K", focus: "Property management contracts, apartment turnovers, office cleaning. Build recurring B2B revenue." },
+  { n: 7, name: "Enterprise", range: "$100K+", focus: "Full commercial + residential mix. Operations manager in place. Business runs without the owner daily." },
 ];
 
 const PHASES_LIST = [
@@ -1753,6 +1817,10 @@ const PHASES_LIST = [
   { label: "Systems Running", target: 35000 },
   { label: "Owner Optional", target: 40000 },
   { label: "Full Ownership", target: 50000 },
+  { label: "Multi-Team Growth", target: 60000 },
+  { label: "Commercial Expansion", target: 75000 },
+  { label: "Property Management Contracts", target: 85000 },
+  { label: "Enterprise Ready", target: 100000 },
 ];
 
 const READINESS_CHECKS = [
@@ -1834,6 +1902,11 @@ function GrowthLadderTab({ inp, c, t }) {
                   {s.name}
                 </div>
                 <div style={{ fontSize: 12, color: t.muted }}>{s.range}</div>
+                {isCurrent && (
+                  <div style={{ fontSize: 11, color: t.green, marginTop: 4, lineHeight: 1.4 }}>
+                    {s.focus}
+                  </div>
+                )}
               </div>
               {isCurrent && <Badge label="You Are Here" color={t.green} />}
             </div>
