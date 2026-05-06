@@ -63,6 +63,11 @@ function calc(inp) {
     targetMargin,
     targetAcv,
     goalRevenue,
+    suppliesPerJob = 10,
+    driveTimeCost = 8,
+    insurancePerJob = 6,
+    platformFeePct = 0,
+    cancellationRate = 5,
   } = inp;
 
   const freqDiv =
@@ -85,9 +90,16 @@ function calc(inp) {
     recAvgCharge > 0 ? (workerPayout / recAvgCharge) * 100 : 0;
   const grossMargin = 100 - effectiveLaborPct;
 
+  // Real cost per job (all-in)
+  const overheadPerJob = (suppliesPerJob || 0) + (driveTimeCost || 0) + (insurancePerJob || 0);
+  const platformFeePerJob = recAvgCharge > 0 ? recAvgCharge * ((platformFeePct || 0) / 100) : (workerPayout * ((platformFeePct || 0) / 100));
+  const cancellationAdj = (cancellationRate || 0) > 0 ? 1 / (1 - (cancellationRate || 0) / 100) : 1;
+  const totalCostPerJob = (workerPayout + overheadPerJob + platformFeePerJob) * cancellationAdj;
+
   const tm = targetMargin > 0 ? targetMargin : 100 - laborPct;
   const priceFloor =
-    tm < 100 && workerPayout > 0 ? workerPayout / (1 - tm / 100) : 0;
+    tm < 100 && totalCostPerJob > 0 ? totalCostPerJob / (1 - tm / 100) : 0;
+  const recommendedNewClientRate = priceFloor > 0 ? Math.ceil(priceFloor * 1.15 / 5) * 5 : 0;
   const hourlyFloor =
     jobHours > 0 && tm < 100 && workerPayout > 0
       ? workerPayout / jobHours / (1 - tm / 100)
@@ -116,6 +128,14 @@ function calc(inp) {
           ? workerPayout / h / (1 - tm / 100)
           : 0,
     }));
+
+  // Monthly growth number — new clients/month needed to hit goal
+  const monthlyGrowthNumber = currentAcv > 0 && gap > 0 ? Math.ceil(gap / currentAcv) : 0;
+
+  // 90-day achievable — assumes ~5 new clients/month capacity
+  const newClients90 = 5 * 3;
+  const projected90Rev = (clientCount + newClients90) * currentAcv;
+  const pct90 = goalRevenue > 0 ? Math.min((projected90Rev / goalRevenue) * 100, 100) : 0;
 
   // Revenue scenarios
   const effTargetAcv = targetAcv > 0 ? targetAcv : acvNeeded;
@@ -149,9 +169,14 @@ function calc(inp) {
     recAvgCharge,
     otAvgCharge,
     workerPayout,
+    overheadPerJob,
+    platformFeePerJob,
+    cancellationAdj,
+    totalCostPerJob,
     effectiveLaborPct,
     grossMargin,
     priceFloor,
+    recommendedNewClientRate,
     hourlyFloor,
     hourlyFloorGrid,
     leakagePerJob,
@@ -163,6 +188,9 @@ function calc(inp) {
     acvNeeded,
     legacyRevenue,
     needFromNew,
+    monthlyGrowthNumber,
+    projected90Rev,
+    pct90,
     scenarios,
     newClientRows,
     stage,
@@ -1144,6 +1172,14 @@ function PriceFloorTab({ inp, setInp, c, t }) {
           onChange={set("clientCount")}
           t={t}
         />
+        <div style={{ fontSize: 11, color: t.muted, textTransform: "uppercase", letterSpacing: "0.1em", margin: "14px 0 8px" }}>
+          Real Costs / Job
+        </div>
+        <InputRow label="Supplies" prefix="$" value={inp.suppliesPerJob} onChange={set("suppliesPerJob")} t={t} />
+        <InputRow label="Drive Time" prefix="$" value={inp.driveTimeCost} onChange={set("driveTimeCost")} t={t} />
+        <InputRow label="Insurance" prefix="$" value={inp.insurancePerJob} onChange={set("insurancePerJob")} t={t} />
+        <InputRow label="Platform Fee" suffix="%" value={inp.platformFeePct} onChange={set("platformFeePct")} t={t} />
+        <InputRow label="Cancellation Rate" suffix="%" value={inp.cancellationRate} onChange={set("cancellationRate")} t={t} />
       </div>
 
       {/* Right: Results */}
@@ -1152,8 +1188,15 @@ function PriceFloorTab({ inp, setInp, c, t }) {
           <StatCard
             label="Price Floor"
             value={<AnimatedNumber value={c.priceFloor} prefix="$" decimals={0} />}
-            sub="Minimum sustainable charge"
+            sub="All-in minimum (labor + overhead)"
             accent={t.green}
+            t={t}
+          />
+          <StatCard
+            label="New Client Rate"
+            value={<AnimatedNumber value={c.recommendedNewClientRate} prefix="$" decimals={0} />}
+            sub="Recommended rate for new clients"
+            accent={t.blue}
             t={t}
           />
           <StatCard
@@ -1214,6 +1257,29 @@ function PriceFloorTab({ inp, setInp, c, t }) {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Real Cost Breakdown */}
+        <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: "16px 20px", marginBottom: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 12 }}>Real Cost Per Job — All-In</div>
+          {[
+            { label: "Labor (worker payout)", value: c.workerPayout, color: t.text },
+            { label: "Supplies", value: inp.suppliesPerJob || 0, color: t.text },
+            { label: "Drive Time", value: inp.driveTimeCost || 0, color: t.text },
+            { label: "Insurance", value: inp.insurancePerJob || 0, color: t.text },
+            { label: `Platform Fee (${inp.platformFeePct || 0}%)`, value: c.platformFeePerJob, color: t.text },
+            { label: `Cancellation Adj (${inp.cancellationRate || 0}%)`, value: c.totalCostPerJob - (c.workerPayout + (inp.suppliesPerJob||0) + (inp.driveTimeCost||0) + (inp.insurancePerJob||0) + c.platformFeePerJob), color: t.amber },
+            { label: "Total Cost / Job", value: c.totalCostPerJob, color: t.red, bold: true },
+            { label: "Price Floor (all-in)", value: c.priceFloor, color: t.green, bold: true },
+            { label: "→ Recommended New Client Rate", value: c.recommendedNewClientRate, color: t.blue, bold: true },
+          ].map((row) => (
+            <div key={row.label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${t.border}` }}>
+              <span style={{ fontSize: 12, color: row.bold ? t.text : t.muted, fontWeight: row.bold ? 700 : 400 }}>{row.label}</span>
+              <span style={{ fontFamily: "DM Mono", fontWeight: row.bold ? 700 : 500, fontSize: 13, color: row.color }}>
+                ${(row.value || 0).toFixed(0)}
+              </span>
+            </div>
+          ))}
         </div>
 
         {/* Leakage Breakdown */}
@@ -1499,7 +1565,7 @@ function RevenueScenariosTab({ inp, setInp, c, t }) {
         />
       </div>
       <div style={{ flex: 1, minWidth: 280 }}>
-        <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
           <StatCard
             label="Current MRR"
             value={<AnimatedNumber value={c.currentMrr} prefix="$" decimals={0} />}
@@ -1513,7 +1579,34 @@ function RevenueScenariosTab({ inp, setInp, c, t }) {
             sub={c.gap <= 0 ? "Goal reached!" : undefined}
             t={t}
           />
+          <StatCard
+            label="Monthly Growth #"
+            value={<AnimatedNumber value={c.monthlyGrowthNumber} decimals={0} />}
+            sub="New recurring clients/mo needed"
+            accent={t.purple}
+            t={t}
+          />
         </div>
+
+        {/* 90-Day Achievable */}
+        {c.goalRevenue > 0 && (
+          <div style={{ background: t.surface, border: `1px solid ${t.purple}40`, borderRadius: 12, padding: "16px 20px", marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontWeight: 600, color: t.text }}>90-Day Achievable</span>
+                <Badge label="~5 new clients/mo" color={t.purple} />
+              </div>
+              <span style={{ fontFamily: "DM Mono", color: t.purple, fontWeight: 600, fontSize: 13 }}>
+                ${c.projected90Rev.toFixed(0)}/mo · {c.pct90.toFixed(0)}% of goal
+              </span>
+            </div>
+            <ProgressBar value={c.projected90Rev} max={c.goalRevenue} color={t.purple} t={t} />
+            <div style={{ fontSize: 11, color: t.muted, marginTop: 8 }}>
+              Based on adding 15 new recurring clients over 90 days (5/month) at your current ACV of ${c.currentAcv.toFixed(0)}/mo.
+              {c.pct90 < 100 && ` Still ${(100 - c.pct90).toFixed(0)}% short of goal — raise ACV or add more clients to close the gap.`}
+            </div>
+          </div>
+        )}
         {c.scenarios.map((s, i) => (
           <div
             key={i}
@@ -2320,9 +2413,14 @@ const DEFAULT_INP = {
   clientCount: 0,
   freqType: "biweekly",
   jobHours: 3,
-  targetMargin: 60,
+  targetMargin: 50,
   targetAcv: 0,
   goalRevenue: 0,
+  suppliesPerJob: 10,
+  driveTimeCost: 8,
+  insurancePerJob: 6,
+  platformFeePct: 0,
+  cancellationRate: 5,
 };
 
 const DEFAULT_QS = {
