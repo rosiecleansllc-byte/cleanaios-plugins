@@ -1,11 +1,14 @@
 {
-  "name": "margin-stabilization-plugin",
-  "version": "1.0.0",
-  "description": "Live financial decision tool for service-based cleaning businesses. Calculates price floors, premium pricing models, revenue scenarios, client ACV targets, and growth ladder benchmarks based on your actual labor costs and revenue.",
-  "author": {
-    "name": "Built with Clean AIOS",
-    "email": "hello@rosiecleans.com"
-  },
-  "component": "margin-stabilization-plugin.jsx",
-  "entry": "MarginPlugin"
+  "plugins": [
+    {
+      "name": "margin-stabilization",
+      "version": "2.1.0",
+      "display_name": "Margin & Stabilization",
+      "description": "A live financial decision tool for service business owners. Calculates all-in price floors, detects margin leakage, models revenue scenarios including 90-day achievable, tracks 7 business stages up to $100K+, and delivers an AI-powered diagnosis.",
+      "file": "margin-stabilization-v2.1.0.zip",
+      "author": "Rosie Cleans LLC",
+      "category": "finance",
+      "tags": ["pricing", "margin", "revenue", "service-business", "cleaning"]
+    }
+  ]
 }
